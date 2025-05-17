@@ -1,8 +1,8 @@
 # kamilBrowser
 
-kamilBrowser adalah browser sederhana berbasis **GTK+3** dan **WebKitGTK**, ditulis dalam bahasa C. Dibuat dan diuji di Debian Linux, MyBrowser menyediakan fungsi dasar browsing seperti address bar, membuka halaman web, tab baru, dan menutup tab.
+kamilBrowser adalah browser sederhana berbasis **GTK+3** dan **WebKitGTK**, ditulis dalam bahasa C. Dibuat dan diuji di Debian Linux, kamilBrowser menyediakan fungsi dasar browsing seperti address bar, membuka halaman web, tab baru, dan menutup tab.
 
-![Screenshot MyBrowser](./assets/preview/preview-v001.png)
+![Screenshot kamilBrowser](./assets/preview/preview-v001.png)
 
 ## ✨ Fitur (v0.0.1)
 
