@@ -125,7 +125,7 @@ BrowserTab* create_browser_tab(BrowserUI* browser, const gchar* default_url) {
 
 void create_browser_ui(BrowserUI* browser) {
     browser->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(browser->window), "Kamil Browser");
+    gtk_window_set_title(GTK_WINDOW(browser->window), "Kamil Browser v0.0.1");
     gtk_window_set_default_size(GTK_WINDOW(browser->window), 1024, 768);
     g_signal_connect(browser->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
