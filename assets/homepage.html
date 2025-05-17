@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Selamat Datang di Kamil Browser</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Kamil Browser</h1>
+        <p>Selamat datang di browser buatan sendiri.</p>
+        <form onsubmit="goToURL(event)">
+            <input type="text" id="url-input" placeholder="Ketik URL dan tekan Enter" />
+        </form>
+        <small>Contoh: https://www.google.com</small>
+    </div>
+
+    <script>
+        function goToURL(e) {
+            e.preventDefault();
+            const url = document.getElementById("url-input").value;
+            if (url) {
+                window.location.href = url.startsWith("http") ? url : "https://" + url;
+            }
+        }
+    </script>
+</body>
+</html>
