@@ -1,4 +1,5 @@
 #include "../include/browser.h"
+#include <json-glib/json-glib.h>
 
 static void on_title_received(GObject* source_object, GAsyncResult* res, gpointer user_data) {
     WebKitWebView* web_view = WEBKIT_WEB_VIEW(source_object);
@@ -120,25 +121,42 @@ BrowserTab* create_browser_tab(BrowserUI* browser, const gchar* default_url) {
     // === Container utama tab ===
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-    // === Toolbar tab (untuk URL bar) ===
+    // === Toolbar tab (untuk URL bar dan navigasi) ===
     GtkWidget* toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_widget_set_margin_top(toolbar, 5);
     gtk_widget_set_margin_bottom(toolbar, 5);
     gtk_widget_set_margin_start(toolbar, 5);
     gtk_widget_set_margin_end(toolbar, 5);
 
+    // Tombol navigasi
+    GtkWidget* back_button = gtk_button_new_with_label("←");
+    GtkWidget* forward_button = gtk_button_new_with_label("→");
+    GtkWidget* refresh_button = gtk_button_new_with_label("⟳");
+
+    gtk_box_pack_start(GTK_BOX(toolbar), back_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(toolbar), forward_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(toolbar), refresh_button, FALSE, FALSE, 0);
+
+    // URL bar
     tab->url_bar = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(tab->url_bar), "Enter URL...");
     gtk_box_pack_start(GTK_BOX(toolbar), tab->url_bar, TRUE, TRUE, 0);
+
     gtk_box_pack_start(GTK_BOX(vbox), toolbar, FALSE, FALSE, 0);
 
     // === WebView ===
     tab->web_view = WEBKIT_WEB_VIEW(webkit_web_view_new());
     gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(tab->web_view), TRUE, TRUE, 0);
 
-    // === Sinyal URL bar dan WebView ===
+    // === Sinyal untuk navigasi dan URL ===
+    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), tab);
+    g_signal_connect(forward_button, "clicked", G_CALLBACK(on_forward_clicked), tab);
+    g_signal_connect(refresh_button, "clicked", G_CALLBACK(on_refresh_clicked), tab);
+
     g_signal_connect(tab->url_bar, "activate", G_CALLBACK(on_url_enter), tab);
     g_signal_connect(tab->web_view, "load-changed", G_CALLBACK(on_load_changed), tab);
+    g_signal_connect(tab->web_view, "notify::title", G_CALLBACK(on_title_changed), tab);
+
     g_object_set_data(G_OBJECT(tab->url_bar), "browser", browser);
 
     // === Load halaman awal ===
@@ -148,7 +166,6 @@ BrowserTab* create_browser_tab(BrowserUI* browser, const gchar* default_url) {
     GtkWidget* tab_label_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     GtkWidget* label = gtk_label_new("New Tab");
     GtkWidget* close_button = gtk_button_new_with_label("x");
-    // Alternatif modern: gtk_button_new_from_icon_name("window-close-symbolic", GTK_ICON_SIZE_MENU);
 
     gtk_button_set_relief(GTK_BUTTON(close_button), GTK_RELIEF_NONE);
     gtk_widget_set_name(close_button, "close-tab-button");
@@ -156,7 +173,6 @@ BrowserTab* create_browser_tab(BrowserUI* browser, const gchar* default_url) {
 
     gtk_box_pack_start(GTK_BOX(tab_label_box), label, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(tab_label_box), close_button, FALSE, FALSE, 0);
-
     gtk_widget_show_all(tab_label_box);
 
     // === Tambahkan tab ke notebook ===
@@ -171,26 +187,15 @@ BrowserTab* create_browser_tab(BrowserUI* browser, const gchar* default_url) {
     gtk_widget_show_all(vbox);
     gtk_notebook_set_current_page(GTK_NOTEBOOK(browser->notebook), index);
 
-    g_signal_connect(tab->web_view, "notify::title", G_CALLBACK(on_title_changed), tab);
+    // === Simpan pointer tab ke container ===
+    g_object_set_data(G_OBJECT(vbox), "tab-data", tab);
 
-    GtkWidget* back_button = gtk_button_new_with_label("←");
-    GtkWidget* forward_button = gtk_button_new_with_label("→");
-    GtkWidget* refresh_button = gtk_button_new_with_label("⟳");
-
-    gtk_box_pack_start(GTK_BOX(toolbar), back_button, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(toolbar), forward_button, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(toolbar), refresh_button, FALSE, FALSE, 0);
-
-    // Sambungkan sinyal
-    g_signal_connect(back_button, "clicked", G_CALLBACK(on_back_clicked), tab);
-    g_signal_connect(forward_button, "clicked", G_CALLBACK(on_forward_clicked), tab);
-    g_signal_connect(refresh_button, "clicked", G_CALLBACK(on_refresh_clicked), tab);
-
-    // === Sinyal untuk tombol close ===
+    // === Sinyal untuk close button ===
     g_signal_connect(close_button, "clicked", G_CALLBACK(on_close_tab_clicked), browser);
 
     return tab;
 }
+
 
 static void on_settings_clicked(GtkButton* button, gpointer user_data) {
     BrowserUI* browser = (BrowserUI*)user_data;
@@ -237,6 +242,155 @@ static void on_settings_clicked(GtkButton* button, gpointer user_data) {
     gtk_widget_destroy(dialog);
 }
 
+void save_bookmark(const gchar *title, const gchar *url) {
+    if (!title || !url) return;
+
+    JsonParser *parser = json_parser_new();
+    GError *error = NULL;
+    JsonNode *root;
+    JsonArray *array;
+
+    // Cek apakah file sudah ada
+    if (g_file_test("./build/bookmarks.json", G_FILE_TEST_EXISTS)) {
+        json_parser_load_from_file(parser, "./build/bookmarks.json", &error);
+        if (error) {
+            g_warning("Gagal load bookmarks.json: %s", error->message);
+            g_clear_error(&error);
+            g_object_unref(parser);
+            return;
+        }
+
+        root = json_parser_get_root(parser);
+        array = json_node_get_array(root);
+    } else {
+        // Buat array baru jika file belum ada
+        array = json_array_new();
+        root = json_node_new(JSON_NODE_ARRAY);
+        json_node_take_array(root, array);
+    }
+
+    // Buat objek bookmark baru
+    JsonObject *bookmark = json_object_new();
+    json_object_set_string_member(bookmark, "title", title);
+    json_object_set_string_member(bookmark, "url", url);
+    json_array_add_object_element(array, bookmark);
+
+    // Simpan kembali ke file
+    JsonGenerator *generator = json_generator_new();
+    json_generator_set_root(generator, root);
+    json_generator_set_pretty(generator, TRUE);
+    json_generator_to_file(generator, "./build/bookmarks.json", &error);
+
+    if (error) {
+        g_warning("Gagal menyimpan bookmark: %s", error->message);
+        g_clear_error(&error);
+    }
+
+    // Bersih-bersih
+    g_object_unref(generator);
+    g_object_unref(parser);
+}
+
+void on_bookmark_clicked(GtkButton *button, gpointer user_data) {
+    BrowserUI *browser = (BrowserUI *)user_data;
+
+    // Dapatkan tab yang aktif
+    gint page_num = gtk_notebook_get_current_page(GTK_NOTEBOOK(browser->notebook));
+    GtkWidget *child = gtk_notebook_get_nth_page(GTK_NOTEBOOK(browser->notebook), page_num);
+    if (!child) return;
+
+    BrowserTab *tab = g_object_get_data(G_OBJECT(child), "tab-data");
+    if (!tab) return;
+
+    const gchar *url = webkit_web_view_get_uri(tab->web_view);
+    const gchar *title = webkit_web_view_get_title(tab->web_view);
+    save_bookmark(title, url);
+
+    g_print("Bookmark disimpan: %s - %s\n", title, url);
+}
+
+void on_bookmark_button_clicked(GtkButton *button, gpointer user_data) {
+    const gchar *url = g_object_get_data(G_OBJECT(button), "url");
+    BrowserUI *browser = (BrowserUI *)user_data;
+
+    if (url) {
+        create_browser_tab(browser, url);  // Gunakan fungsi buat tab kamu
+    }
+}
+
+void on_bookmark_menu_clicked(GtkButton *button, gpointer user_data) {
+    BrowserUI *browser = (BrowserUI *)user_data;
+
+    JsonParser *parser = json_parser_new();
+    GError *error = NULL;
+
+    if (!json_parser_load_from_file(parser, "./build/bookmarks.json", &error)) {
+        g_warning("Gagal membaca bookmark.json: %s", error->message);
+        g_error_free(error);
+        g_object_unref(parser);
+        return;
+    }
+
+    JsonNode *root = json_parser_get_root(parser);
+    JsonArray *bookmarks = json_node_get_array(root);
+
+    // === Dialog
+    GtkWidget *dialog = gtk_dialog_new_with_buttons(
+        "Bookmarks",
+        GTK_WINDOW(browser->window),
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        "_Close", GTK_RESPONSE_CLOSE,
+        NULL
+    );
+
+    GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+
+    guint len = json_array_get_length(bookmarks);
+    if (len == 0) {
+        // Tampilkan pesan kalau belum ada bookmark
+        GtkWidget *label = gtk_label_new("Belum ada bookmark.");
+        gtk_container_add(GTK_CONTAINER(content_area), label);
+        gtk_widget_show(label);
+    } else {
+        GtkWidget *list_box = gtk_list_box_new();
+        gtk_container_add(GTK_CONTAINER(content_area), list_box);
+
+        for (guint i = 0; i < len; i++) {
+            JsonObject *bookmark = json_array_get_object_element(bookmarks, i);
+            const gchar *title = json_object_get_string_member(bookmark, "title");
+            const gchar *url = json_object_get_string_member(bookmark, "url");
+
+            // Buat tombol untuk setiap bookmark
+            gchar *button_text = g_strdup_printf("%s\n%s", title, url);
+            GtkWidget *bookmark_button = gtk_button_new_with_label(button_text);
+
+            gtk_widget_set_halign(bookmark_button, GTK_ALIGN_START);
+            gtk_widget_set_valign(bookmark_button, GTK_ALIGN_CENTER);
+
+            // Buat label di tombol rata kiri
+            GtkWidget *label = gtk_bin_get_child(GTK_BIN(bookmark_button));
+            gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+
+            g_free(button_text);
+
+            // Simpan URL di data objek tombol
+            g_object_set_data(G_OBJECT(bookmark_button), "url", (gpointer)url);
+            g_signal_connect(bookmark_button, "clicked", G_CALLBACK(on_bookmark_button_clicked), browser);
+
+            gtk_list_box_insert(GTK_LIST_BOX(list_box), bookmark_button, -1);
+        }
+        gtk_widget_show_all(list_box);
+    }
+
+    gtk_widget_show_all(dialog);
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    g_object_unref(parser);
+}
+
+
+
 void create_browser_ui(BrowserUI* browser) {
     // Root vertical box
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -248,33 +402,46 @@ void create_browser_ui(BrowserUI* browser) {
     GtkWidget* settings_button = gtk_button_new_with_label("⚙ Settings");
     GtkWidget* new_tab_button = gtk_button_new_with_label("+");
 
+    // Tombol Bookmarks
+    GtkWidget* bookmark_button = gtk_button_new_with_label("★");
+    GtkWidget* bookmark_menu_button = gtk_button_new_with_label("📑 Bookmarks");
+
     // Window utama
     browser->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(browser->window), "Kamil Browser v0.0.1");
-    // gtk_window_fullscreen(GTK_WINDOW(browser->window)); // fullscreen langsung
+    gtk_window_set_title(GTK_WINDOW(browser->window), "Kamil Browser v0.0.3");
     gtk_window_set_default_size(GTK_WINDOW(browser->window), 1024, 768);
     g_signal_connect(browser->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     gtk_container_add(GTK_CONTAINER(browser->window), vbox);
 
-    // Toolbar bagian atas
+    // Tambahkan toolbar ke VBox
     gtk_box_pack_start(GTK_BOX(vbox), toolbar, FALSE, FALSE, 5);
     gtk_widget_set_margin_top(toolbar, 5);
     gtk_widget_set_margin_bottom(toolbar, 5);
     gtk_widget_set_margin_start(toolbar, 5);
     gtk_widget_set_margin_end(toolbar, 5);
 
-    // Tombol Settings di kiri
+    // === Toolbar bagian kiri ===
     gtk_widget_set_tooltip_text(settings_button, "Open Settings");
     g_signal_connect(settings_button, "clicked", G_CALLBACK(on_settings_clicked), browser);
     gtk_box_pack_start(GTK_BOX(toolbar), settings_button, FALSE, FALSE, 0);
+
+    // Tombol bookmark (★)
+    gtk_widget_set_tooltip_text(bookmark_button, "Add Bookmark");
+    g_signal_connect(bookmark_button, "clicked", G_CALLBACK(on_bookmark_clicked), browser);
+    gtk_box_pack_start(GTK_BOX(toolbar), bookmark_button, FALSE, FALSE, 0);
+
+    // Tombol menu bookmark (📑)
+    gtk_widget_set_tooltip_text(bookmark_menu_button, "View Bookmarks");
+    g_signal_connect(bookmark_menu_button, "clicked", G_CALLBACK(on_bookmark_menu_clicked), browser);
+    gtk_box_pack_start(GTK_BOX(toolbar), bookmark_menu_button, FALSE, FALSE, 0);
 
     // Spacer agar tombol "+" ke kanan
     GtkWidget* spacer = gtk_label_new(NULL);
     gtk_widget_set_hexpand(spacer, TRUE);
     gtk_box_pack_start(GTK_BOX(toolbar), spacer, TRUE, TRUE, 0);
 
-    // Tombol "+" (New Tab) di kanan
+    // === Toolbar bagian kanan ===
     gtk_widget_set_tooltip_text(new_tab_button, "New Tab");
     gtk_widget_set_name(new_tab_button, "new-tab-button");
     g_signal_connect(new_tab_button, "clicked", G_CALLBACK(on_new_tab_clicked), browser);
@@ -293,4 +460,3 @@ void create_browser_ui(BrowserUI* browser) {
 
     gtk_widget_show_all(browser->window);
 }
-

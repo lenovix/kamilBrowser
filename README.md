@@ -1,10 +1,10 @@
 # kamilBrowser
 
-kamilBrowser adalah browser sederhana berbasis **GTK+3** dan **WebKitGTK**, ditulis dalam bahasa C. Dibuat dan diuji di Debian Linux, kamilBrowser menyediakan fungsi dasar browsing seperti address bar, membuka halaman web, tab baru, dan menutup tab.
+kamilBrowser adalah browser sederhana berbasis **GTK+3** dan **WebKitGTK**, ditulis dalam bahasa C. Dibuat dan diuji di Debian Linux, kamilBrowser menyediakan fungsi dasar browsing seperti address bar, membuka halaman web, tab baru, menutup tab, dan pengelolaan bookmark sederhana.
 
-![Screenshot kamilBrowser](./assets/preview/preview-v002.png)
+![Screenshot kamilBrowser](./assets/preview/preview-v003.png)
 
-## ✨ Fitur (v0.0.2)
+## ✨ Fitur (v0.0.3)
 
 - ✅ Address bar untuk memasukkan URL
 - ✅ Dukungan membuka halaman web dari internet
@@ -13,8 +13,14 @@ kamilBrowser adalah browser sederhana berbasis **GTK+3** dan **WebKitGTK**, ditu
 - ✅ Tombol navigasi **Back** dan **Forward**
 - ✅ Tombol **Refresh/Reload**
 - ✅ Halaman utama default (homepage)
+- ✅ Bookmark: tambah dan lihat bookmark yang tersimpan
 
 ## 🔄 Changelog
+
+### v0.0.3
+- ➕ Menambahkan fitur bookmark: simpan dan tampilkan bookmark dalam dialog
+- 🐛 Perbaikan UI dialog bookmark dan penanganan error saat file bookmark belum ada
+- 🧹 Refaktor kecil pada fungsi bookmark dan tampilan
 
 ### v0.0.2
 - ➕ Menambahkan tombol navigasi: **Back**, **Forward**, dan **Refresh**
@@ -43,6 +49,7 @@ Pastikan sistem Anda memiliki:
 
 - `gtk+-3.0`
 - `webkit2gtk-4.0`
+- `json-glib-1.0`
 - `gcc`
 - `make`
 - `pkg-config`
@@ -57,7 +64,6 @@ make
 
 ## Rencana Fitur Berikutnya
 - 🎨 Dark Mode
-- 📁 Bookmark
 - 🔒 Private Mode
 - 🧩 Extension Support
 - ⚡ Optimasi RAM untuk tab beku otomatis, preview ringan
