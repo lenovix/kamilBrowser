@@ -1,0 +1,29 @@
+#close-tab-button {
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  color: #444;
+}
+
+#close-tab-button:hover {
+  background: #e74c3c;
+  color: white;
+  border-radius: 3px;
+}
+
+#new-tab-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+#new-tab-button:hover {
+  background-color: #2980b9;
+}
+
+.tab-label {
+  font-weight: bold;
+  padding-right: 8px;
+}

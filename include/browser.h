@@ -7,6 +7,7 @@
 typedef struct {
     GtkWidget* window;
     GtkWidget* notebook;
+    gchar* default_search_engine;
 } BrowserUI;
 
 typedef struct {
